@@ -285,7 +285,6 @@ function M.GetP4Opened_Snacks()
 end
 
 function M.GetP4Opened()
-  local picker_backend = M.opts.picker_backend or "telescope"
 
   local backends = {
     telescope = M.GetP4Opened_Telescope,
@@ -293,7 +292,7 @@ function M.GetP4Opened()
     snacks = M.GetP4Opened_Snacks,
   }
 
-  local picker_fn = backends[picker_backend]
+  local picker_fn = backends[vim.g.perfnvim_picker_backend]
   if not picker_fn then
     error("Unknown picker backend: " .. picker_backend)
   end
