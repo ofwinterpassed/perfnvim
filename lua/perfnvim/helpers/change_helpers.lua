@@ -7,6 +7,7 @@ function M._GetP4FileRevision(file_path, buf_id)
   local function on_stdout(job_id, data, event)
     if event == "stdout" and data then
       for _, line in ipairs(data) do
+        line = string.gsub(line, '\r$', '')
         table.insert(revision_output, line)
       end
     end
@@ -15,10 +16,6 @@ function M._GetP4FileRevision(file_path, buf_id)
   local function on_exit(job_id, exit_code, event)
     if event == "exit" then
       table.remove(revision_output, 1)
-
-      -- Debug: print what we're setting as reference
-      print("Reference lines count: " .. #revision_output)
-      print("Current buffer lines: " .. vim.api.nvim_buf_line_count(buf_id))
 
       require("mini.diff").set_ref_text(buf_id, revision_output)
     end
