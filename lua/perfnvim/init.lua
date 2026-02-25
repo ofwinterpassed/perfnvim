@@ -73,7 +73,9 @@ function M.setup(opts)
   vim.g.perfnvim_p4_opened_files= {}
   vim.g.perfnvim_thread_running = false
 	vim.g.perfnvim_client_root = client_helpers._GetClientRoot()
-  print("Perfnvim client root: " .. vim.g.perfnvim_client_root)
+  if vim.g.perfnvim_client_root ~= nil then
+    print("Perfnvim client root: " .. vim.g.perfnvim_client_root)
+  end
   vim.g.perfnvim_picker_backend = M.opts.picker_backend or "telescope"
 
   if M.opts.timer ~= nil then
