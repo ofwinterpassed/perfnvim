@@ -1,6 +1,6 @@
 local M = {}
 
-function M._GetP4FileRevision(file_path, callback)
+function M._GetP4FileRevision(file_path, buf_id)
   -- Get the original file content from P4
   local revision_output = {}
 
@@ -20,7 +20,7 @@ function M._GetP4FileRevision(file_path, callback)
       print("Reference lines count: " .. #revision_output)
       print("Current buffer lines: " .. vim.api.nvim_buf_line_count(buf_id))
 
-      callback(revision_output)
+      require("mini.diff").set_ref_text(buf_id, revision_output)
     end
   end
 
