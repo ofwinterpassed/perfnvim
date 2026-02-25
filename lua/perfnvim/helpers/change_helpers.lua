@@ -1,6 +1,6 @@
 local M = {}
 
-local function _GetP4FileRevision(file_path, callback)
+function M._GetP4FileRevision(file_path, callback)
 	-- Get the original file content from P4
 	local revision_output = {}
 
