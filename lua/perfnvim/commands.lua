@@ -173,56 +173,132 @@ local function short_path(path)
   end
 end
 
--- Create a Telescope picker for the p4 opened files
-function M.GetP4Opened()
-	local actions = require("telescope.actions")
-	local pickers = require("telescope.pickers")
-	local finders = require("telescope.finders")
-	local conf = require("telescope.config").values
-
-    if vim.g.perfnvim_enable == false then
-        local opened_paths = file_helpers._GetP4OpenedPaths()
-        if opened_paths == nil then
-            print("No p4 opened files (or P4 connection failed)")
-            return nil
-        end
-
-        local opened_files = {}
-        for _, file in ipairs(opened_paths) do
-            opened_files[file[1]] = {file[2],file[3]}
-        end
-        -- Transform files to be relative to client_root
-        local opened_files_info = {}
-        for file, file_info in pairs(opened_files) do
-            local type = file_info[1]
-            local chlist = file_info[2]
-            local relative_path = file:gsub("^" .. vim.g.perfnvim_client_root .. "/", "")
-            table.insert(opened_files_info, { full_path = file, relative_path = relative_path, changelist = chlist, type = type})
-        end
-        -- save relative_files to a global variable
-        vim.g.perfnvim_p4_opened_files = opened_files_info
+local function _GetOpenedFilesData()
+  if vim.g.perfnvim_enable == false then
+    local opened_paths = file_helpers._GetP4OpenedPaths()
+    if opened_paths == nil then
+      print("No p4 opened files (or P4 connection failed)")
+      return nil
     end
 
-	pickers
-		.new({}, {
-			finder = finders.new_table({
-				results = vim.g.perfnvim_p4_opened_files,
-				entry_maker = function(entry)
-					return {
-						value = entry.full_path,
-						display = entry.changelist .. " -> " .. short_path(entry.relative_path),
-						ordinal = entry.changelist .. " -> " .. short_path(entry.relative_path),
-					}
-				end,
-			}),
-			sorter = conf.generic_sorter({}),
-            attach_mappings = function(_, map)
-                map("i", "<CR>", actions.select_default)
-                map("n", "<CR>", actions.select_default)
-                return true
-            end,
-		})
-		:find()
+    local opened_files = {}
+    for _, file in ipairs(opened_paths) do
+      opened_files[file[1]] = { file[2], file[3] }
+    end
+
+    local opened_files_info = {}
+    for file, file_info in pairs(opened_files) do
+      local type = file_info[1]
+      local chlist = file_info[2]
+      local relative_path = file:gsub("^" .. vim.g.perfnvim_client_root .. "/", "")
+      table.insert(opened_files_info, {
+        full_path = file,
+        relative_path = relative_path,
+        changelist = chlist,
+        type = type
+      })
+    end
+    vim.g.perfnvim_p4_opened_files = opened_files_info
+  end
+
+  return vim.g.perfnvim_p4_opened_files
+end
+
+function M.GetP4Opened_Telescope()
+  local actions = require("telescope.actions")
+  local pickers = require("telescope.pickers")
+  local finders = require("telescope.finders")
+  local conf = require("telescope.config").values
+
+  local opened_files = _GetOpenedFilesData()
+  if not opened_files then return nil end
+
+  pickers
+      .new({}, {
+        finder = finders.new_table({
+          results = opened_files,
+          entry_maker = function(entry)
+            return {
+              value = entry.full_path,
+              display = entry.changelist .. " -> " .. short_path(entry.relative_path),
+              ordinal = entry.changelist .. " -> " .. short_path(entry.relative_path),
+            }
+          end,
+        }),
+        sorter = conf.generic_sorter({}),
+        attach_mappings = function(_, map)
+          map("i", "<CR>", actions.select_default)
+          map("n", "<CR>", actions.select_default)
+          return true
+        end,
+      })
+      :find()
+end
+
+function M.GetP4Opened_Mini()
+  local opened_files = _GetOpenedFilesData()
+  if not opened_files then return nil end
+
+  local items = {}
+  for _, entry in ipairs(opened_files) do
+    table.insert(items, {
+      text = entry.changelist .. " -> " .. short_path(entry.relative_path),
+      full_path = entry.full_path,
+    })
+  end
+
+  require("mini.pick").start({
+    source = {
+      items = items,
+      name = "P4 Opened Files",
+      choose = function(item)
+        if item then
+          vim.cmd("edit " .. vim.fn.fnameescape(item.full_path))
+        end
+      end,
+    },
+  })
+end
+
+function M.GetP4Opened_Snacks()
+  local opened_files = _GetOpenedFilesData()
+  if not opened_files then return nil end
+
+  local items = {}
+  for _, entry in ipairs(opened_files) do
+    table.insert(items, {
+      text = entry.changelist .. " -> " .. short_path(entry.relative_path),
+      file = entry.full_path,
+    })
+  end
+
+  Snacks.picker.pick({
+    source = "p4_opened",
+    items = items,
+    format = "{text}",
+    on_confirm = function(item)
+      if item then
+        vim.cmd("edit " .. vim.fn.fnameescape(item.file))
+      end
+    end,
+  })
+end
+
+function M.GetP4Opened()
+  local picker_backend = M.opts.picker_backend or "telescope"
+
+  local backends = {
+    telescope = M.GetP4Opened_Telescope,
+    mini = M.GetP4Opened_Mini,
+    snacks = M.GetP4Opened_Snacks,
+  }
+
+  local picker_fn = backends[picker_backend]
+  if not picker_fn then
+    error("Unknown picker backend: " .. picker_backend)
+  end
+
+  return picker_fn()
 end
 
 function M.GoToPreviousChange()
