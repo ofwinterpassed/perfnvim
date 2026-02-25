@@ -14,6 +14,9 @@ function M._GetP4FileRevision(file_path, callback)
 
 	local function on_exit(job_id, exit_code, event)
 		if event == "exit" then
+			-- Filter out the P4 header line (first line is metadata)
+			-- P4 print output starts with: //depot/path#revision - line count
+			table.remove(revision_output, 1)
 			callback(revision_output)
 		end
 	end
