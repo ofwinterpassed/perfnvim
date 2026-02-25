@@ -1,129 +1,31 @@
-local constants = require("perfnvim.constants")
-
 local M = {}
 
-local function _PlaceSigns(signgroupidentifier, signname, lines, file_path)
-	for _, line_num in ipairs(lines) do
-		vim.fn.sign_place(0, signgroupidentifier, signname, vim.fn.bufnr(file_path), { lnum = line_num })
-	end
-end
+function M._GetP4FileRevision(file_path, buf_id)
+  -- Get the original file content from P4
+  local revision_output = {}
 
-local function _ClearSignsAndPlace(signgroupidentifier, signname, lines, file_path)
-	-- Clear existing signs from the buffer
-	vim.fn.sign_unplace(signgroupidentifier, { buffer = vim.fn.bufnr(file_path) })
-	-- Place new signs
-	_PlaceSigns(signgroupidentifier, signname, lines, file_path)
-end
+  local function on_stdout(job_id, data, event)
+    if event == "stdout" and data then
+      for _, line in ipairs(data) do
+        line = string.gsub(line, '\r$', '')
+        table.insert(revision_output, line)
+      end
+    end
+  end
 
-function M._AnnotateAddedLines(lines, file_path)
-	local added_lines = {}
-	for _, line in ipairs(lines) do
-		if line:match("^(%d+)a") then
-			local start_num, end_num = line:match("%d+a(%d+),(%d+)")
-			if start_num and end_num then
-				start_num = tonumber(start_num)
-				end_num = tonumber(end_num)
-				for i = start_num, end_num do
-					table.insert(added_lines, i)
-				end
-			else
-				local num = line:match("%d+a(%d+)")
-				if num then
-					num = tonumber(num)
-					table.insert(added_lines, num)
-				end
-			end
-		end
-	end
-	_ClearSignsAndPlace(constants.p4addSignGroupIdentifier, constants.p4addSignName, added_lines, file_path)
-end
+  local function on_exit(job_id, exit_code, event)
+    if event == "exit" then
+      table.remove(revision_output, 1)
 
-function M._AnnotateDeletedLines(lines, file_path)
-	local deleted_lines = {}
-	for _, line in ipairs(lines) do
-		if line:match("^%d+[,?%d+]*d%d+[,?%d+]*") then
-			local start_num = line:match("d(%d+)")
-			if start_num then
-				start_num = tonumber(start_num)
-				table.insert(deleted_lines, start_num)
-			end
-		end
-	end
-	_ClearSignsAndPlace(constants.p4deletesSignGroupIdentifier, constants.p4deleteSignName, deleted_lines, file_path)
-end
+      require("mini.diff").set_ref_text(buf_id, revision_output)
+    end
+  end
 
-function M._AnnotateChangedLines(lines, file_path)
-	local changed_lines = {}
-	for _, line in ipairs(lines) do
-		if line:match("^%d+[,?%d+]*c%d+[,?%d+]*") then
-			local start_num, end_num = line:match("c(%d+),?(%d*)")
-			if start_num then
-				start_num = tonumber(start_num)
-				if end_num == "" or end_num == nil then
-					end_num = start_num
-				else
-					end_num = tonumber(end_num)
-				end
-				for i = start_num, end_num do
-					table.insert(changed_lines, i)
-				end
-			end
-		end
-	end
-	_ClearSignsAndPlace(constants.p4changesSignGroupIdentifier, constants.p4changeSignName, changed_lines, file_path)
-end
-
-function M._AnnotateSigns()
-	local file_path = vim.fn.expand("%:p")
-	local diff_output = {}
-    local is_opened_for_add = false
-
-	local function on_stdout(job_id, data, event)
-		if event == "stdout" and data then
-			for _, line in ipairs(data) do
-				table.insert(diff_output, line)
-			end
-		end
-	end
-
-	local function on_stderr(job_id, data, event)
-		if event == "stderr" and data then
-			for _, line in ipairs(data) do
-                if line:match("not opened for edit.") then
-                        is_opened_for_add = true;
-			    end
-            end
-		end
-	end
-
-	local function on_exit(job_id, exit_code, event)
-		if event == "exit" then
-            if is_opened_for_add then
-                -- for each line in the file, mark it as added
-                local bufnr = vim.fn.bufnr(file_path, false) -- true loads the buffer if not loaded
-                local line_count = vim.api.nvim_buf_line_count(bufnr)
-                local lines = {}
-                for i = 1, line_count do
-                    table.insert(lines, i)
-                end
-                _ClearSignsAndPlace(constants.p4addSignGroupIdentifier, constants.p4addSignName, lines, file_path)
-                return
-            end
-			local lines = vim.split(table.concat(diff_output, "\n"), "\n")
-            if #lines > 0 then
-                M._AnnotateAddedLines(lines, file_path)
-                M._AnnotateChangedLines(lines, file_path)
-                M._AnnotateDeletedLines(lines, file_path)
-            end
-		end
-	end
-
-	vim.fn.jobstart("p4 diff " .. file_path, {
-		on_stdout = on_stdout,
-        on_stderr = on_stderr,
-		on_exit = on_exit,
-		stdout_buffered = true,
-	})
+  vim.fn.jobstart("p4 print " .. file_path .. "#have", {
+    on_stdout = on_stdout,
+    on_exit = on_exit,
+    stdout_buffered = true,
+  })
 end
 
 return M
