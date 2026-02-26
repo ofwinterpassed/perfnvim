@@ -67,16 +67,19 @@ function M.setup(opts)
 		commands.GoToPreviousChange()
 	end, {})
 
-    vim.g.perfnvim_enable = false
-    vim.g.perfnvim_p4_changelists= {}
-    vim.g.perfnvim_p4_opened_files= {}
-    vim.g.perfnvim_thread_running = false
+  vim.g.perfnvim_enable = false
+  vim.g.perfnvim_p4_changelists= {}
+  vim.g.perfnvim_p4_opened_files= {}
+  vim.g.perfnvim_thread_running = false
 	vim.g.perfnvim_client_root = client_helpers._GetClientRoot()
+  if vim.g.perfnvim_client_root ~= nil then
     print("Perfnvim client root: " .. vim.g.perfnvim_client_root)
+  end
+  vim.g.perfnvim_picker_backend = M.opts.picker_backend or "telescope"
 
-    if M.opts.timer ~= nil then
-        M.timer = M.opts.timer
-    end
+  if M.opts.timer ~= nil then
+      M.timer = M.opts.timer
+  end
 
 	M.perfnvim_timer = vim.uv.new_timer()
     if M.opts.autostart == true then
