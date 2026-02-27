@@ -97,14 +97,6 @@ function M.P4opened()
 	commands.GetP4Opened()
 end
 
-function M.P4next()
-	commands.GoToNextChange()
-end
-
-function M.P4prev()
-	commands.GoToPreviousChange()
-end
-
 function M.P4enable()
     vim.g.perfnvim_enable = true
 
