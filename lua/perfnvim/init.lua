@@ -122,7 +122,7 @@ function M.gen_source_p4()
     name = "p4",
     attach = function(buf_id)
       -- Make sure to fail if not in a p4 repo
-      local handle = io.popen("p4 info" .. " 2> /dev/null")
+      local handle = io.popen("p4 opened" .. " 2> /dev/null")
       if not handle then return false end
       -- Initial setup: get the reference text from P4
       local file_path = vim.api.nvim_buf_get_name(buf_id)
